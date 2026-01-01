@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 
 // Define TypeScript interfaces
 interface Student {
@@ -12,7 +10,6 @@ interface Student {
   course: string;
   attendance: boolean;
   allowed: boolean;
-  source?: 'studentModel' | 'connection' | undefined;
 }
 
 interface NewStudent {
@@ -35,12 +32,26 @@ interface Activity {
 }
 
 function TeacherControl() {
-  const [students, setStudents] = useState<Student[]>([]);
+  // Mock student data
+  const mockStudents: Student[] = [
+    { _id: "1", name: "John Doe", email: "john@example.com", course: "CS-101", attendance: true, allowed: true },
+    { _id: "2", name: "Jane Smith", email: "jane@example.com", course: "CS-101", attendance: true, allowed: false },
+    { _id: "3", name: "Bob Johnson", email: "bob@example.com", course: "CS-201", attendance: false, allowed: false },
+    { _id: "4", name: "Alice Williams", email: "alice@example.com", course: "CS-201", attendance: true, allowed: true },
+    { _id: "5", name: "Charlie Brown", email: "charlie@example.com", course: "CS-301", attendance: false, allowed: false },
+    { _id: "6", name: "Emma Wilson", email: "emma@example.com", course: "CS-101", attendance: true, allowed: true },
+    { _id: "7", name: "Michael Davis", email: "michael@example.com", course: "CS-301", attendance: true, allowed: false },
+    { _id: "8", name: "Sophia Garcia", email: "sophia@example.com", course: "CS-201", attendance: false, allowed: false },
+    { _id: "9", name: "David Miller", email: "david@example.com", course: "CS-101", attendance: true, allowed: true },
+    { _id: "10", name: "Olivia Taylor", email: "olivia@example.com", course: "CS-301", attendance: true, allowed: true },
+  ];
+
+  const [students, setStudents] = useState<Student[]>(mockStudents);
   const [selectedQuiz, setSelectedQuiz] = useState<string>("Quiz 1");
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedCourse, setSelectedCourse] = useState<string>("All");
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [showAddStudent, setShowAddStudent] = useState<boolean>(false);
   const [newStudent, setNewStudent] = useState<NewStudent>({
     name: "",
@@ -48,49 +59,27 @@ function TeacherControl() {
     course: "CS-101"
   });
 
-  const router = useRouter();
-  
-  // Use environment variable for API base URL
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000/api";
-
-  // Get current teacher
-  const getCurrentTeacher = (): string | null => {
-    if (typeof window !== "undefined") {
-      const user = localStorage.getItem("user");
-      return user ? JSON.parse(user).id : null;
-    }
-    return null;
-  };
-
-  // Fetch students from API
-  const fetchStudents = async (): Promise<void> => {
-    try {
-      const teacherId = getCurrentTeacher();
-      if (!teacherId) {
-        console.error("Teacher not found in localStorage");
-        router.push("/login");
-        return;
-      }
-
-      const response = await fetch(`${API_BASE}/teacher/students/${teacherId}`);
-      const data = await response.json();
-
-      if (data.success) {
-        setStudents(data.students);
-      } else {
-        console.error("Failed to fetch students:", data.message);
-        setStudents([]);
-      }
-    } catch (error) {
-      console.error("Error fetching students:", error);
-      setStudents([]);
-    }
-  };
-
-  // Load students on component mount
+  // Initialize students from localStorage if available, otherwise use mock data
   useEffect(() => {
-    fetchStudents().finally(() => setIsLoading(false));
+    if (typeof window !== "undefined") {
+      const savedStudents = localStorage.getItem("teacherControlStudents");
+      if (savedStudents) {
+        try {
+          setStudents(JSON.parse(savedStudents));
+        } catch (error) {
+          console.error("Error loading saved students:", error);
+          // Keep using mockStudents as fallback
+        }
+      }
+    }
   }, []);
+
+  // Save students to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== "undefined" && students.length > 0) {
+      localStorage.setItem("teacherControlStudents", JSON.stringify(students));
+    }
+  }, [students]);
 
   // Filter students based on search and course
   const filteredStudents = students.filter(student => {
@@ -100,339 +89,113 @@ function TeacherControl() {
     return matchesSearch && matchesCourse;
   });
 
-  // Toggle attendance with database update
-  const toggleAttendance = async (id: string): Promise<void> => {
-    try {
-      const student = students.find(s => s._id === id);
-      if (!student) return;
-      
-      const newAttendance = !student.attendance;
-      
-      // Check if student exists in Student model or is linked student
-      if (student.source === 'studentModel' || student.source === undefined) {
-        const response = await fetch(`${API_BASE}/students/update/${id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            attendance: newAttendance,
-            allowed: newAttendance ? student.allowed : false
-          }),
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-          setStudents(prev =>
-            prev.map(s =>
-              s._id === id
-                ? {
-                    ...s,
-                    attendance: newAttendance,
-                    allowed: newAttendance ? s.allowed : false
-                  }
-                : s
-            )
-          );
-        } else {
-          alert('Failed to update attendance: ' + data.message);
-        }
-      } else {
-        // For linked students, just update local state
-        setStudents(prev =>
-          prev.map(s =>
-            s._id === id
-              ? {
-                  ...s,
-                  attendance: newAttendance,
-                  allowed: newAttendance ? s.allowed : false
-                }
-              : s
-          )
-        );
-        setStatusMessage("✅ Attendance updated for linked student!");
-        setTimeout(() => setStatusMessage(""), 3000);
-      }
-    } catch (error) {
-      console.error('Error updating attendance:', error);
-      alert('Error updating attendance');
-    }
+  // Toggle attendance
+  const toggleAttendance = (id: string): void => {
+    setStudents(prev =>
+      prev.map(s =>
+        s._id === id
+          ? {
+              ...s,
+              attendance: !s.attendance,
+              allowed: !s.attendance ? s.allowed : false // Reset allowed if marking absent
+            }
+          : s
+      )
+    );
+    setStatusMessage("✅ Attendance updated!");
+    setTimeout(() => setStatusMessage(""), 3000);
   };
 
-  // Toggle allow with database update
-  const toggleAllow = async (id: string): Promise<void> => {
-    try {
-      const student = students.find(s => s._id === id);
-      if (!student) return;
-      
-      const newAllowed = !student.allowed;
+  // Toggle allow
+  const toggleAllow = (id: string): void => {
+    const student = students.find(s => s._id === id);
+    if (!student) return;
+    
+    const newAllowed = !student.allowed;
 
-      // Can't allow if not present
-      if (!student.attendance && newAllowed) {
-        alert('Cannot allow quiz access for absent students!');
-        return;
-      }
-
-      // Check if student exists in Student model or is linked student
-      if (student.source === 'studentModel' || student.source === undefined) {
-        const response = await fetch(`${API_BASE}/students/update/${id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ allowed: newAllowed }),
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-          setStudents(prev =>
-            prev.map(s =>
-              s._id === id ? { ...s, allowed: newAllowed } : s
-            )
-          );
-        } else {
-          alert('Failed to update quiz access: ' + data.message);
-        }
-      } else {
-        // For linked students, just update local state
-        setStudents(prev =>
-          prev.map(s =>
-            s._id === id ? { ...s, allowed: newAllowed } : s
-          )
-        );
-        setStatusMessage("✅ Quiz access updated for linked student!");
-        setTimeout(() => setStatusMessage(""), 3000);
-      }
-    } catch (error) {
-      console.error('Error updating quiz access:', error);
-      alert('Error updating quiz access');
+    // Can't allow if not present
+    if (!student.attendance && newAllowed) {
+      alert('Cannot allow quiz access for absent students!');
+      return;
     }
+
+    setStudents(prev =>
+      prev.map(s =>
+        s._id === id ? { ...s, allowed: newAllowed } : s
+      )
+    );
+    setStatusMessage("✅ Quiz access updated!");
+    setTimeout(() => setStatusMessage(""), 3000);
   };
 
   // Save all changes
-  const handleSave = async (): Promise<void> => {
+  const handleSave = (): void => {
     setIsLoading(true);
-    try {
-      setStatusMessage("✅ Attendance and quiz permissions updated successfully!");
-      setTimeout(() => setStatusMessage(""), 4000);
-    } catch (error) {
-      setStatusMessage("❌ Error saving changes");
-    } finally {
+    setTimeout(() => {
+      setStatusMessage("✅ All changes saved successfully!");
       setIsLoading(false);
-    }
+      setTimeout(() => setStatusMessage(""), 4000);
+    }, 1000);
   };
 
   // Bulk actions
-  const handleBulkAction = async (action: 'markAllPresent' | 'allowAllPresent'): Promise<void> => {
+  const handleBulkAction = (action: 'markAllPresent' | 'allowAllPresent'): void => {
     setIsLoading(true);
-    try {
-      const teacherId = getCurrentTeacher();
-      if (!teacherId) return;
-      
+    
+    setTimeout(() => {
       if (action === 'markAllPresent') {
-        // Separate students by type
-        const studentModelStudents = students.filter(s => s.source === 'studentModel' || s.source === undefined);
-        const linkedStudents = students.filter(s => s.source === 'connection');
-        
-        // Update Student model students via bulk API
-        if (studentModelStudents.length > 0) {
-          const updates = studentModelStudents.map(student => ({
-            studentId: student._id,
-            fields: { 
-              attendance: true,
-            }
-          }));
-
-          const response = await fetch(`${API_BASE}/students/bulk-update`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ teacherId, updates }),
-          });
-
-          const data = await response.json();
-          
-          if (!data.success) {
-            console.error('Bulk update failed for student model students:', data.message);
-          }
-        }
-
-        // Update local state for ALL students (both types)
         setStudents(prev => prev.map(student => ({
           ...student,
           attendance: true,
         })));
-        
         setStatusMessage("✅ All students marked present!");
-      } 
-      else if (action === 'allowAllPresent') {
-        // Allow all present students (both types)
-        const presentStudents = students.filter(s => s.attendance);
-        
-        // Separate present students by type
-        const studentModelPresent = presentStudents.filter(s => s.source === 'studentModel' || s.source === undefined);
-        const linkedPresent = presentStudents.filter(s => s.source === 'connection');
-        
-        // Update Student model students via bulk API
-        if (studentModelPresent.length > 0) {
-          const updates = studentModelPresent.map(student => ({
-            studentId: student._id,
-            fields: { allowed: true }
-          }));
-
-          const response = await fetch(`${API_BASE}/students/bulk-update`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ teacherId, updates }),
-          });
-
-          const data = await response.json();
-          
-          if (!data.success) {
-            console.error('Bulk update failed for student model students:', data.message);
-          }
-        }
-
-        // Update local state for ALL present students (both types)
+      } else if (action === 'allowAllPresent') {
         setStudents(prev => prev.map(student => 
           student.attendance ? { ...student, allowed: true } : student
         ));
-        
         setStatusMessage("✅ All present students allowed for quiz!");
       }
-
-      setTimeout(() => setStatusMessage(""), 4000);
-
-    } catch (error) {
-      console.error('Bulk action error:', error);
-      setStatusMessage("❌ Error performing bulk action");
-    } finally {
+      
       setIsLoading(false);
-    }
+      setTimeout(() => setStatusMessage(""), 4000);
+    }, 1000);
   };
 
-  // Add new student with automatic connection creation AND Student model entry
-  const handleAddStudent = async (e: React.FormEvent): Promise<void> => {
+  // Add new student
+  const handleAddStudent = (e: React.FormEvent): void => {
     e.preventDefault();
     setIsLoading(true);
-    try {
-      const teacherId = getCurrentTeacher();
-      if (!teacherId) {
-        alert("Teacher not found");
-        return;
-      }
+    
+    setTimeout(() => {
+      const newId = (students.length + 1).toString();
+      const newStudentObj: Student = {
+        _id: newId,
+        name: newStudent.name,
+        email: newStudent.email,
+        course: newStudent.course,
+        attendance: false,
+        allowed: false
+      };
       
-      // 1. First check if student already exists as a user
-      const userCheckResponse = await fetch(`${API_BASE}/students/search?query=${encodeURIComponent(newStudent.email)}&teacherId=${teacherId}`);
-      const userCheckData = await userCheckResponse.json();
-
-      let studentId: string;
-      let studentUser: Student;
-
-      if (userCheckData.success && userCheckData.students.length > 0) {
-        // Student already exists as user
-        studentUser = userCheckData.students[0];
-        studentId = studentUser._id;
-      } else {
-        // 2. Create new student in teacher's student list (Student model)
-        const studentResponse = await fetch(`${API_BASE}/students/add`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            name: newStudent.name,
-            email: newStudent.email,
-            course: newStudent.course,
-            teacherId 
-          }),
-        });
-
-        const studentData = await studentResponse.json();
-
-        if (!studentData.success) {
-          alert('Failed to add student: ' + studentData.message);
-          return;
-        }
-
-        studentId = studentData.student._id;
-      }
-
-      // 3. Create connection request
-      const connectionResponse = await fetch(`${API_BASE}/connections/request`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          teacherId,
-          studentId: studentId,
-          course: newStudent.course
-        }),
-      });
-
-      const connectionData = await connectionResponse.json();
-
-      if (connectionData.success) {
-        // 4. Automatically approve the connection
-        const approveResponse = await fetch(`${API_BASE}/connections/respond`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            connectionId: connectionData.connection.id,
-            action: 'approve'
-          }),
-        });
-
-        const approveData = await approveResponse.json();
-
-        if (approveData.success) {
-          setShowAddStudent(false);
-          setNewStudent({ name: "", email: "", course: "CS-101" });
-          setStatusMessage("✅ Student added and connected successfully!");
-          await fetchStudents(); // Refresh list
-        } else {
-          setStatusMessage("⚠️ Student added but connection failed. Please approve manually in Manage Students.");
-        }
-      } else {
-        setStatusMessage("⚠️ Student added but connection failed. Please connect manually in Manage Students.");
-      }
-
-      setTimeout(() => setStatusMessage(""), 5000);
+      setStudents(prev => [...prev, newStudentObj]);
+      setShowAddStudent(false);
+      setNewStudent({ name: "", email: "", course: "CS-101" });
+      setStatusMessage("✅ Student added successfully!");
       
-    } catch (error) {
-      console.error('Error adding student:', error);
-      alert('Error adding student');
-    } finally {
       setIsLoading(false);
-    }
+      setTimeout(() => setStatusMessage(""), 5000);
+    }, 1000);
   };
 
   // Delete student
-  const handleDeleteStudent = async (id: string, name: string): Promise<void> => {
+  const handleDeleteStudent = (id: string, name: string): void => {
     if (!window.confirm(`Are you sure you want to delete ${name}?`)) {
       return;
     }
 
-    try {
-      const response = await fetch(`${API_BASE}/students/delete/${id}`, {
-        method: 'DELETE',
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setStatusMessage("✅ Student deleted successfully!");
-        await fetchStudents(); // Refresh list
-        setTimeout(() => setStatusMessage(""), 4000);
-      } else {
-        alert('Failed to delete student: ' + data.message);
-      }
-    } catch (error) {
-      console.error('Error deleting student:', error);
-      alert('Error deleting student');
-    }
+    setStudents(prev => prev.filter(student => student._id !== id));
+    setStatusMessage("✅ Student deleted successfully!");
+    setTimeout(() => setStatusMessage(""), 4000);
   };
 
   const stats: Stat[] = [
@@ -470,17 +233,6 @@ function TeacherControl() {
     { date: "5 Oct 2025", action: "Teacher settings saved successfully", icon: "⚙️" },
     { date: "3 Oct 2025", action: "Reports generated for Batch 2022-CS", icon: "📈" },
   ];
-
-  if (isLoading && !statusMessage && students.length === 0) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading teacher dashboard...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 text-gray-800">
@@ -600,7 +352,7 @@ function TeacherControl() {
               <div className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
                 <h3 className="text-xl font-bold text-gray-800 mb-4">Add New Student</h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Student will be automatically connected to your account and can access your quizzes.
+                  Add students to manage their attendance and quiz permissions.
                 </p>
                 <form onSubmit={handleAddStudent}>
                   <div className="space-y-4">
@@ -633,9 +385,9 @@ function TeacherControl() {
                         onChange={(e) => setNewStudent({...newStudent, course: e.target.value})}
                         className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-300 text-sm sm:text-base"
                       >
-                        <option value="CS-101">CS-101</option>
-                        <option value="CS-201">CS-201</option>
-                        <option value="CS-301">CS-301</option>
+                        <option value="CS-101">CS-101 - Fundamentals of Programming</option>
+                        <option value="CS-201">CS-201 - Object-Oriented Concepts</option>
+                        <option value="CS-301">CS-301 - Data Structures</option>
                       </select>
                     </div>
                   </div>
@@ -833,13 +585,9 @@ function TeacherControl() {
             </ul>
             
             <div className="mt-6 pt-4 border-t border-indigo-400">
-              <Link
-                href="/contact"
-                className="inline-flex items-center gap-2 bg-white text-indigo-600 px-4 py-2 rounded-xl font-semibold hover:bg-gray-50 transition-all duration-300 text-sm sm:text-base"
-              >
-                <span>💬</span>
-                Contact Support
-              </Link>
+              <div className="text-sm text-indigo-200 mb-2">
+                <strong>Note:</strong> This is a standalone demo. All data is saved locally in your browser.
+              </div>
             </div>
           </section>
         </div>

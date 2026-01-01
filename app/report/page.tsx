@@ -22,111 +22,49 @@ function Report() {
   const [downloading, setDownloading] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [teacherId, setTeacherId] = useState<string | null>(null);
   const [selectedReports, setSelectedReports] = useState<string[]>([]);
-  const [debugInfo, setDebugInfo] = useState<string>("");
 
-  // Get current teacher - SIMPLIFIED
-  useEffect(() => {
-    console.log("=== DEBUG: Checking localStorage ===");
+  // Fetch reports - No authentication required
+  const fetchReports = async (): Promise<void> => {
+    setIsLoading(true);
     
-    // First, let's see what's in localStorage
-    const allItems: {[key: string]: string} = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key) {
-        allItems[key] = localStorage.getItem(key) || "";
-      }
-    }
-    console.log("All localStorage items:", allItems);
-    setDebugInfo(JSON.stringify(allItems, null, 2));
-    
-    // Try to find teacher/user data in various possible keys
-    const possibleUserKeys = ['user', 'currentUser', 'teacher', 'teacherData', 'userData', 'auth', 'authUser'];
-    let foundUser = false;
-    
-    for (const key of possibleUserKeys) {
-      const data = localStorage.getItem(key);
-      if (data) {
-        console.log(`Found data in key: ${key}`, data);
-        try {
-          const user = JSON.parse(data);
-          // Try to extract teacher ID from various possible property names
-          const possibleIdFields = ['id', '_id', 'teacherId', 'userId', 'user_id', 'teacher_id'];
-          for (const field of possibleIdFields) {
-            if (user[field]) {
-              console.log(`Found teacher ID in field ${field}:`, user[field]);
-              setTeacherId(String(user[field]));
-              foundUser = true;
-              break;
-            }
-          }
-          if (foundUser) break;
-        } catch (error) {
-          console.error(`Error parsing data from key ${key}:`, error);
+    try {
+      // Try to fetch from API
+      console.log("Fetching reports...");
+      const response = await fetch(`http://localhost:5000/api/reports/all`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Reports from API:", data);
+
+        if (data.success && data.reports) {
+          const formattedReports: Report[] = data.reports.map((report: any) => ({
+            ...report,
+            id: String(report.id)
+          }));
+          setReports(formattedReports);
+          
+          const uniqueQuizzes = [...new Set(formattedReports.map((r: Report) => r.quiz))];
+          setQuizzes(['all', ...uniqueQuizzes]);
+          setIsLoading(false);
+          return;
         }
       }
-    }
-    
-    if (!foundUser) {
-      console.log("No teacher/user data found in localStorage. User might need to login.");
-      // For testing, let's create a mock teacher ID
-      const mockTeacherId = "mock-teacher-123";
-      console.log("Using mock teacher ID for testing:", mockTeacherId);
-      setTeacherId(mockTeacherId);
-      // Store mock data for testing
-      localStorage.setItem("user", JSON.stringify({ 
-        id: mockTeacherId, 
-        name: "Test Teacher", 
-        email: "teacher@test.com" 
-      }));
-    }
-    
-    setIsLoading(false);
-  }, []);
-
-  // Fetch reports from database
-  const fetchReports = async (): Promise<void> => {
-    if (!teacherId) {
-      console.log("Teacher ID not available yet");
-      return;
-    }
-
-    try {
-      console.log("Fetching reports for teacher:", teacherId);
-      const response = await fetch(`http://localhost:5000/api/reports/teacher/${teacherId}`);
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      // If API fails or returns no data, use mock data
+      console.log("Using mock data for reports");
+      createMockData();
       
-      const data = await response.json();
-      console.log("Reports response:", data);
-
-      if (data.success && data.reports) {
-        const formattedReports: Report[] = data.reports.map((report: any) => ({
-          ...report,
-          id: String(report.id)
-        }));
-        setReports(formattedReports);
-        
-        const uniqueQuizzes = [...new Set(formattedReports.map((r: Report) => r.quiz))];
-        setQuizzes(['all', ...uniqueQuizzes]);
-      } else {
-        console.log("No reports found or API returned different structure:", data);
-        // Create mock data for testing if API fails
-        createMockData();
-      }
     } catch (error) {
-      console.error("Error fetching reports:", error);
-      // Create mock data for testing
+      console.log("API error, using mock data:", error);
+      // Use mock data as fallback
       createMockData();
     }
   };
 
   // Create mock data for testing
   const createMockData = (): void => {
-    console.log("Creating mock data for testing");
+    console.log("Creating mock data");
     const mockReports: Report[] = [
       {
         id: "1",
@@ -182,20 +120,52 @@ function Report() {
         grade: "D",
         timeSpent: "25:30",
         date: "2024-01-15"
+      },
+      {
+        id: "6",
+        student: "Emma Wilson",
+        quiz: "Science Quiz",
+        score: 20,
+        total: 20,
+        percentage: 100,
+        grade: "A+",
+        timeSpent: "10:20",
+        date: "2024-01-16"
+      },
+      {
+        id: "7",
+        student: "Michael Brown",
+        quiz: "History Quiz",
+        score: 15,
+        total: 20,
+        percentage: 75,
+        grade: "B",
+        timeSpent: "20:15",
+        date: "2024-01-17"
+      },
+      {
+        id: "8",
+        student: "Sophia Davis",
+        quiz: "English Quiz",
+        score: 17,
+        total: 20,
+        percentage: 85,
+        grade: "B+",
+        timeSpent: "14:45",
+        date: "2024-01-18"
       }
     ];
     
     setReports(mockReports);
     const uniqueQuizzes = [...new Set(mockReports.map((r: Report) => r.quiz))];
     setQuizzes(['all', ...uniqueQuizzes]);
+    setIsLoading(false);
   };
 
-  // Load reports when teacherId is available
+  // Load reports on component mount
   useEffect(() => {
-    if (teacherId) {
-      fetchReports();
-    }
-  }, [teacherId]);
+    fetchReports();
+  }, []);
 
   // Filter reports
   const filtered = reports.filter((r: Report) => {
@@ -227,6 +197,11 @@ function Report() {
 
   // Handle report download
   const handleDownload = async (format = 'pdf'): Promise<void> => {
+    if (filtered.length === 0) {
+      alert("No reports to download!");
+      return;
+    }
+    
     setDownloading(true);
     try {
       setTimeout(() => {
@@ -250,6 +225,12 @@ function Report() {
       // Remove from local state
       setReports(prev => prev.filter(r => r.id !== reportId));
       setSelectedReports(prev => prev.filter(id => id !== reportId));
+      
+      // Update quizzes list
+      const updatedReports = reports.filter(r => r.id !== reportId);
+      const uniqueQuizzes = [...new Set(updatedReports.map((r: Report) => r.quiz))];
+      setQuizzes(['all', ...uniqueQuizzes]);
+      
       alert('Report deleted successfully!');
     } catch (error) {
       console.error('Error deleting report:', error);
@@ -344,8 +325,7 @@ function Report() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading dashboard...</p>
-          <p className="text-sm text-gray-500 mt-2">Checking authentication...</p>
+          <p className="text-gray-600 font-medium">Loading reports dashboard...</p>
         </div>
       </div>
     );
@@ -357,67 +337,12 @@ function Report() {
       <div className="h-20"></div>
 
       <main className="max-w-7xl mx-auto px-6 pb-16">
-        {/* Debug Info Panel - Collapsible */}
-        <div className="mb-6">
-          <details className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-300">
-            <summary className="p-4 cursor-pointer font-semibold text-gray-700">
-              🔍 Debug Information (Click to expand)
-            </summary>
-            <div className="p-4 border-t border-gray-200">
-              <div className="mb-2">
-                <span className="font-medium">Teacher ID:</span> {teacherId || "Not found"}
-              </div>
-              <div className="mb-2">
-                <span className="font-medium">Total Reports:</span> {reports.length}
-              </div>
-              <div className="mb-2">
-                <span className="font-medium">Filtered Reports:</span> {filtered.length}
-              </div>
-              <div className="mt-2">
-                <span className="font-medium">LocalStorage Contents:</span>
-                <pre className="mt-2 p-3 bg-gray-100 rounded-lg text-sm overflow-auto max-h-40">
-                  {debugInfo}
-                </pre>
-              </div>
-              <div className="mt-4 flex gap-2">
-                <button
-                  onClick={() => {
-                    localStorage.clear();
-                    window.location.reload();
-                  }}
-                  className="px-3 py-1 bg-red-100 text-red-700 rounded-lg text-sm"
-                >
-                  Clear LocalStorage & Reload
-                </button>
-                <button
-                  onClick={() => fetchReports()}
-                  className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm"
-                >
-                  Reload Reports
-                </button>
-                <button
-                  onClick={() => {
-                    localStorage.setItem("user", JSON.stringify({ 
-                      id: "teacher-123", 
-                      name: "Test Teacher" 
-                    }));
-                    window.location.reload();
-                  }}
-                  className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm"
-                >
-                  Set Test User
-                </button>
-              </div>
-            </div>
-          </details>
-        </div>
-
         {/* Controls Section */}
         <section className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-8 border border-white/60 mb-8 hover:shadow-xl transition-all duration-300">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div className="flex-1">
               <h2 className="text-2xl font-bold text-gray-800 mb-2">Quiz Performance Analytics</h2>
-              <p className="text-gray-600">Teacher: {teacherId?.substring(0, 12)}...</p>
+              <p className="text-gray-600">View and manage student quiz reports</p>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-4">
@@ -627,12 +552,6 @@ function Report() {
                   <div className="text-6xl mb-4">🔍</div>
                   <p className="text-gray-500 text-lg">No reports found</p>
                   <p className="text-gray-400">Try adjusting your search criteria</p>
-                  <button
-                    onClick={createMockData}
-                    className="mt-4 px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors duration-200"
-                  >
-                    Load Sample Data
-                  </button>
                 </div>
               )}
             </section>

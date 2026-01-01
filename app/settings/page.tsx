@@ -70,47 +70,30 @@ function Settings() {
 
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsCategory>("general");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
-  // Get current teacher
-  const getCurrentTeacher = (): string | null => {
-    // In Next.js, localStorage is only available on client side
-    if (typeof window !== 'undefined') {
-      const user = localStorage.getItem("user");
-      return user ? JSON.parse(user).id : null;
-    }
-    return null;
-  };
-
-  // Fetch settings from database
-  const fetchSettings = async () => {
-    try {
-      const teacherId = getCurrentTeacher();
-      if (!teacherId) {
-        console.error("Teacher not found in localStorage");
-        return;
-      }
-
-      const response = await fetch(`http://localhost:5000/api/settings/teacher/${teacherId}`);
-      const data = await response.json();
-
-      if (data.success) {
-        setSettings(data.settings);
-        setLastUpdated(data.settings.lastUpdated);
-      } else {
-        console.error("Failed to fetch settings:", data.message);
-      }
-    } catch (error) {
-      console.error("Error fetching settings:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Load settings on component mount
+  // Load settings from localStorage on component mount
   useEffect(() => {
-    fetchSettings();
+    setIsLoading(true);
+    if (typeof window !== 'undefined') {
+      try {
+        const savedSettings = localStorage.getItem("quizSettings");
+        const savedLastUpdated = localStorage.getItem("settingsLastUpdated");
+        
+        if (savedSettings) {
+          const parsedSettings = JSON.parse(savedSettings);
+          setSettings(parsedSettings);
+        }
+        
+        if (savedLastUpdated) {
+          setLastUpdated(savedLastUpdated);
+        }
+      } catch (error) {
+        console.error("Error loading settings from localStorage:", error);
+      }
+    }
+    setIsLoading(false);
   }, []);
 
   const handleChange = (category: SettingsCategory, field: string, value: string | number | boolean) => {
@@ -124,66 +107,83 @@ function Settings() {
     setSaved(false);
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     setIsLoading(true);
-    try {
-      const teacherId = getCurrentTeacher();
-      
-      const response = await fetch(`http://localhost:5000/api/settings/update/${teacherId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(settings),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setSaved(true);
-        setLastUpdated(data.settings.lastUpdated);
-        setTimeout(() => setSaved(false), 3000);
-      } else {
-        alert('Failed to save settings: ' + data.message);
+    
+    // Simulate API call delay
+    setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        try {
+          // Save to localStorage
+          localStorage.setItem("quizSettings", JSON.stringify(settings));
+          
+          const now = new Date().toISOString();
+          localStorage.setItem("settingsLastUpdated", now);
+          setLastUpdated(now);
+          
+          setSaved(true);
+          setTimeout(() => setSaved(false), 3000);
+        } catch (error) {
+          console.error("Error saving settings:", error);
+          alert('Error saving settings to browser storage');
+        }
       }
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      alert('Error saving settings');
-    } finally {
       setIsLoading(false);
-    }
+    }, 1000);
   };
 
-  const handleReset = async () => {
+  const handleReset = () => {
     if (!window.confirm("Are you sure you want to reset all settings to default?")) {
       return;
     }
 
     setIsLoading(true);
-    try {
-      const teacherId = getCurrentTeacher();
+    
+    // Simulate API call delay
+    setTimeout(() => {
+      const defaultSettings: SettingsType = {
+        general: {
+          questionsPerPage: 5,
+          shuffleQuestions: true,
+          shuffleOptions: false,
+          marksPerQuestion: 1,
+          timeLimit: 30,
+          allowReview: true,
+          autoSubmit: false,
+          showResults: true,
+          difficulty: "medium",
+        },
+        security: {
+          autoSubmit: false,
+          sessionTimeout: 30,
+          preventCopyPaste: true,
+          fullScreenMode: false
+        },
+        notifications: {
+          emailNotifications: true,
+          quizSubmissions: true,
+          studentQuestions: true,
+          systemUpdates: false,
+          performanceReports: true,
+          deliverySchedule: "immediately"
+        }
+      };
       
-      const response = await fetch(`http://localhost:5000/api/settings/reset/${teacherId}`, {
-        method: 'POST',
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setSettings(data.settings);
-        setLastUpdated(data.settings.lastUpdated);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
-        alert('Settings reset to defaults successfully!');
-      } else {
-        alert('Failed to reset settings: ' + data.message);
+      setSettings(defaultSettings);
+      
+      if (typeof window !== 'undefined') {
+        localStorage.setItem("quizSettings", JSON.stringify(defaultSettings));
+        const now = new Date().toISOString();
+        localStorage.setItem("settingsLastUpdated", now);
+        setLastUpdated(now);
       }
-    } catch (error) {
-      console.error('Error resetting settings:', error);
-      alert('Error resetting settings');
-    } finally {
+      
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+      alert('Settings reset to defaults successfully!');
+      
       setIsLoading(false);
-    }
+    }, 1000);
   };
 
   const tabs = [
@@ -264,6 +264,12 @@ function Settings() {
                   Last updated: {new Date(lastUpdated).toLocaleDateString()}
                 </div>
               )}
+
+              <div className="mt-6 p-3 bg-blue-50 rounded-xl border border-blue-200">
+                <p className="text-xs text-blue-700">
+                  <strong>Note:</strong> Settings are saved in your browser's local storage.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -532,20 +538,20 @@ function Settings() {
 
                     <div className="grid md:grid-cols-2 gap-6">
                       <div className="p-4 bg-green-50 rounded-xl border border-green-200">
-                        <h4 className="font-semibold text-green-800 mb-2">Data Encryption</h4>
-                        <p className="text-sm text-green-600">All quiz data is encrypted for security</p>
+                        <h4 className="font-semibold text-green-800 mb-2">Data Protection</h4>
+                        <p className="text-sm text-green-600">Settings are stored locally in your browser</p>
                         <div className="flex items-center gap-2 mt-2">
                           <span className="text-green-500">✅</span>
-                          <span className="text-sm text-green-700">Enabled</span>
+                          <span className="text-sm text-green-700">Local Storage</span>
                         </div>
                       </div>
 
                       <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
                         <h4 className="font-semibold text-blue-800 mb-2">Session Security</h4>
-                        <p className="text-sm text-blue-600">Automatic logout after inactivity</p>
+                        <p className="text-sm text-blue-600">Auto-save prevents data loss</p>
                         <div className="flex items-center gap-2 mt-2">
-                          <span className="text-blue-500">⏰</span>
-                          <span className="text-sm text-blue-700">{settings.security.sessionTimeout} minutes</span>
+                          <span className="text-blue-500">💾</span>
+                          <span className="text-sm text-blue-700">Auto-Save Enabled</span>
                         </div>
                       </div>
                     </div>
