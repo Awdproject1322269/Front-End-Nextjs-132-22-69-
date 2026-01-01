@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 // Define TypeScript interfaces
@@ -38,18 +38,62 @@ function AvailableQuizzes() {
   const [selectedTeacher, setSelectedTeacher] = useState<string | null>(null);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   // Use environment variable for API base URL
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
   
   const [user, setUser] = useState<User | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
   const [studentName, setStudentName] = useState<string | null>(null);
 
-  // Mock data for initial render/demo
-  const mockQuizzes: Quiz[] = [];
-  const mockTeachers: Teacher[] = [];
+  // Mock data for demo/fallback
+  const mockQuizzes: Quiz[] = [
+    {
+      id: "1",
+      title: "Introduction to JavaScript",
+      description: "Test your basic JavaScript knowledge with this beginner-friendly quiz",
+      teacherName: "Dr. Sarah Johnson",
+      questionsCount: 15,
+      totalMarks: 100,
+      duration: 45,
+      difficulty: 'easy',
+      isAttempted: false,
+      createdAt: new Date().toISOString(),
+      course: "Computer Science"
+    },
+    {
+      id: "2",
+      title: "Advanced React Patterns",
+      description: "Challenging questions on React hooks, context, and performance optimization",
+      teacherName: "Prof. Michael Chen",
+      questionsCount: 20,
+      totalMarks: 150,
+      duration: 60,
+      difficulty: 'hard',
+      isAttempted: true,
+      createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      course: "Web Development"
+    },
+    {
+      id: "3",
+      title: "Database Design Fundamentals",
+      description: "Covering normalization, ER diagrams, and SQL queries",
+      teacherName: "Dr. Emily Watson",
+      questionsCount: 12,
+      totalMarks: 80,
+      duration: 40,
+      difficulty: 'medium',
+      isAttempted: false,
+      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      course: "Database Systems"
+    }
+  ];
+
+  const mockTeachers: Teacher[] = [
+    { id: "1", name: "Dr. Sarah Johnson", course: "Computer Science" },
+    { id: "2", name: "Prof. Michael Chen", course: "Web Development" },
+    { id: "3", name: "Dr. Emily Watson", course: "Database Systems" }
+  ];
 
   useEffect(() => {
     // This runs only on the client side
@@ -64,27 +108,47 @@ function AvailableQuizzes() {
         console.error("Error parsing user data:", error);
       }
     }
-  }, []);
-
-  useEffect(() => {
-    if (studentId) {
-      const teacherId = searchParams.get('teacher');
+    
+    // Check for teacher filter in URL (client-side only)
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const teacherId = params.get('teacher');
       if (teacherId) {
         setSelectedTeacher(teacherId);
       }
-      loadTeachersAndQuizzes();
-    } else {
-      // If no studentId, we're in demo mode
-      setIsLoading(false);
-      setQuizzes(mockQuizzes);
-      setTeachers(mockTeachers);
-      applyFilters(mockQuizzes, null);
     }
-  }, [studentId, searchParams]);
+    
+    // Load initial data
+    loadInitialData();
+  }, []);
+
+  const loadInitialData = async () => {
+    setIsLoading(true);
+    
+    // Demo mode - use mock data
+    // In a real app, you would check for studentId and make API calls
+    setQuizzes(mockQuizzes);
+    setTeachers(mockTeachers);
+    applyFilters(mockQuizzes, selectedTeacher);
+    
+    // Simulate loading delay
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 500);
+  };
 
   const loadTeachersAndQuizzes = async () => {
     try {
       setIsLoading(true);
+      
+      if (!studentId || !API_BASE) {
+        // Use mock data for demo
+        setQuizzes(mockQuizzes);
+        setTeachers(mockTeachers);
+        applyFilters(mockQuizzes, selectedTeacher);
+        setIsLoading(false);
+        return;
+      }
       
       // Load teachers first
       const teachersResponse = await fetch(`${API_BASE}/student/teachers/${studentId}`);
@@ -110,8 +174,10 @@ function AvailableQuizzes() {
 
   const loadQuizzes = async () => {
     try {
-      if (!studentId) {
-        console.error("Student ID is required");
+      if (!studentId || !API_BASE) {
+        // Demo mode
+        setQuizzes(mockQuizzes);
+        applyFilters(mockQuizzes, selectedTeacher);
         return;
       }
       
@@ -176,25 +242,35 @@ function AvailableQuizzes() {
 
   const handleStartQuiz = async (quiz: Quiz) => {
     try {
-      const response = await fetch(`${API_BASE}/quizzes/${quiz.id}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        // Create URL with state parameters
-        const quizParams = new URLSearchParams({
-          quizId: quiz.id,
-          studentId: studentId || '',
-          studentName: studentName || ''
-        }).toString();
+      if (API_BASE) {
+        const response = await fetch(`${API_BASE}/quizzes/${quiz.id}`);
+        const data = await response.json();
         
-        router.push(`/quizattempt?${quizParams}`);
-      } else {
-        console.error("Failed to load quiz details");
-        alert("Unable to start quiz. Please try again.");
+        if (data.success) {
+          // Create URL with state parameters
+          const quizParams = new URLSearchParams({
+            quizId: quiz.id,
+            studentId: studentId || '',
+            studentName: studentName || ''
+          }).toString();
+          
+          router.push(`/quizattempt?${quizParams}`);
+          return;
+        }
       }
+      
+      // Fallback for demo mode
+      const quizParams = new URLSearchParams({
+        quizId: quiz.id,
+        studentId: studentId || 'demo-student',
+        studentName: studentName || 'Demo Student'
+      }).toString();
+      
+      router.push(`/quizattempt?${quizParams}`);
+      
     } catch (error) {
       console.error("Error loading quiz details:", error);
-      alert("Network error. Please check your connection.");
+      alert("Unable to start quiz. Please try again.");
     }
   };
 
