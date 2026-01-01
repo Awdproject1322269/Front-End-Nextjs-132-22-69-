@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 // Define interfaces for type safety
@@ -50,11 +50,9 @@ interface DashboardData {
 
 function Dashboard() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   
-  // Get role from URL or use default
-  const initialRole = searchParams.get('role') || "Teacher";
-  const [userRole, setUserRole] = useState(initialRole);
+  // Default role
+  const [userRole, setUserRole] = useState<"Teacher" | "Student">("Teacher");
   
   const [isLoading, setIsLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState<DashboardData>({
@@ -70,17 +68,38 @@ function Dashboard() {
     Student: { id: "demo-student-456", name: "Student Demo", role: "Student" }
   };
 
-  const [user, setUser] = useState<User>(demoUsers[userRole as keyof typeof demoUsers]);
+  const [user, setUser] = useState<User>(demoUsers["Teacher"]);
+
+  // Get role from URL on client side
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const role = params.get('role');
+      if (role === "Teacher" || role === "Student") {
+        setUserRole(role);
+        setUser(demoUsers[role]);
+      }
+    }
+    
+    // Load initial data
+    setIsLoading(true);
+    setTimeout(() => {
+      setDashboardData(getDemoData(userRole));
+      setIsLoading(false);
+    }, 300);
+  }, []);
 
   // Handle role switch
   const handleRoleSwitch = (role: "Teacher" | "Student") => {
     setUserRole(role);
     setUser(demoUsers[role]);
     
-    // Update URL without reload
-    const newUrl = new URL(window.location.href);
-    newUrl.searchParams.set('role', role);
-    window.history.pushState({}, '', newUrl);
+    // Update URL without reload (client-side only)
+    if (typeof window !== 'undefined') {
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('role', role);
+      window.history.pushState({}, '', newUrl);
+    }
     
     // Load new role data
     setIsLoading(true);
@@ -89,15 +108,6 @@ function Dashboard() {
       setIsLoading(false);
     }, 300);
   };
-
-  // Load dashboard data
-  useEffect(() => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setDashboardData(getDemoData(userRole));
-      setIsLoading(false);
-    }, 500);
-  }, [userRole]);
 
   // Demo data functions
   const getDemoData = (role: string): DashboardData => {
