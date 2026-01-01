@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+
 // Interfaces
 interface User {
   id: string;
@@ -35,9 +36,7 @@ interface Answer {
   timeSpent: number;
 }
 
-// ... your interfaces (User, Question, Quiz, Answer) ...
-
-// Add QuizTimer component here
+// QuizTimer component
 function QuizTimer({ duration, onTimeUp, isActive }: { duration: number; onTimeUp: () => void; isActive: boolean }) {
   const [timeLeft, setTimeLeft] = useState(duration * 60);
   
@@ -131,10 +130,8 @@ function QuizTimer({ duration, onTimeUp, isActive }: { duration: number; onTimeU
   );
 }
 
-
 function QuizAttempt() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
@@ -147,67 +144,117 @@ function QuizAttempt() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const API_BASE = "http://localhost:5000/api";
-
-  // Initialize from URL parameters and localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const quizId = searchParams.get('quizId');
-      const userId = searchParams.get('studentId');
-      const userName = searchParams.get('studentName');
-      
-      if (quizId) {
-        loadQuiz(quizId);
-      } else {
-        setIsLoading(false);
+  // Demo quiz data - NO API CALLS
+  const demoQuiz: Quiz = {
+    id: "demo-quiz-123",
+    title: "Demo Quiz - Computer Science Basics",
+    description: "Test your knowledge of fundamental computer science concepts",
+    teacherId: "demo-teacher-456",
+    questions: [
+      {
+        id: "q1",
+        text: "What does CPU stand for?",
+        options: [
+          "Central Processing Unit",
+          "Computer Processing Unit", 
+          "Central Process Unit",
+          "Computer Process Unit"
+        ],
+        correctAnswer: 0,
+        marks: 5,
+        explanation: "CPU is the primary component of a computer that performs most processing tasks"
+      },
+      {
+        id: "q2", 
+        text: "Which data structure uses LIFO (Last In, First Out) principle?",
+        options: [
+          "Queue",
+          "Stack",
+          "Array",
+          "Linked List"
+        ],
+        correctAnswer: 1,
+        marks: 5,
+        explanation: "Stack follows LIFO while Queue follows FIFO"
+      },
+      {
+        id: "q3",
+        text: "What is the time complexity of binary search?",
+        options: [
+          "O(1)",
+          "O(log n)", 
+          "O(n)",
+          "O(n²)"
+        ],
+        correctAnswer: 1,
+        marks: 5,
+        explanation: "Binary search halves the search space with each comparison"
+      },
+      {
+        id: "q4",
+        text: "Which programming language is known for its use in web development?",
+        options: [
+          "C++",
+          "Java",
+          "JavaScript",
+          "Python"
+        ],
+        correctAnswer: 2,
+        marks: 5,
+        explanation: "JavaScript is primarily used for client-side web development"
       }
-      
-      if (userId) setStudentId(userId);
-      if (userName) setStudentName(userName);
-      
-      // Also check localStorage as fallback
-      const userData = localStorage.getItem("user");
-      if (userData) {
-        try {
-          const parsedUser: User = JSON.parse(userData);
-          if (!userId) setStudentId(parsedUser?.id || null);
-          if (!userName) setStudentName(parsedUser?.name || null);
-        } catch (error) {
-          console.error("Error parsing user data:", error);
-        }
-      }
-    }
-  }, [searchParams]);
-
-  const loadQuiz = async (quizId: string) => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(`${API_BASE}/quizzes/${quizId}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        setQuiz(data.quiz);
-        
-        // Initialize answers when quiz loads
-        if (data.quiz && data.quiz.questions) {
-          const initialAnswers: Answer[] = data.quiz.questions.map((question: Question) => ({
-            questionId: question.id,
-            selectedAnswer: null,
-            timeSpent: 0
-          }));
-          setAnswers(initialAnswers);
-        }
-      } else {
-        console.error("Failed to load quiz:", data);
-      }
-    } catch (error) {
-      console.error("Error loading quiz:", error);
-    } finally {
-      setIsLoading(false);
-    }
+    ],
+    totalMarks: 20,
+    duration: 10,
+    difficulty: "medium"
   };
 
-  // QuizAttempt.jsx - Add this useEffect for debugging
+  // Initialize from URL parameters (client-side only)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const quizId = params.get('quizId');
+      const userId = params.get('studentId');
+      const userName = params.get('studentName');
+      
+      // For demo, always use demo quiz
+      setTimeout(() => {
+        setQuiz(demoQuiz);
+        
+        // Initialize answers
+        const initialAnswers: Answer[] = demoQuiz.questions.map((question: Question) => ({
+          questionId: question.id,
+          selectedAnswer: null,
+          timeSpent: 0
+        }));
+        setAnswers(initialAnswers);
+        
+        if (userId) setStudentId(userId);
+        if (userName) setStudentName(userName);
+        
+        // Also check localStorage as fallback
+        const userData = localStorage.getItem("user");
+        if (userData) {
+          try {
+            const parsedUser: User = JSON.parse(userData);
+            if (!userId) setStudentId(parsedUser?.id || "demo-student");
+            if (!userName) setStudentName(parsedUser?.name || "Demo Student");
+          } catch (error) {
+            console.error("Error parsing user data:", error);
+            setStudentId("demo-student");
+            setStudentName("Demo Student");
+          }
+        } else {
+          setStudentId("demo-student");
+          setStudentName("Demo Student");
+        }
+        
+        setIsLoading(false);
+      }, 500);
+    }
+  }, []);
+
+  // Debug useEffect
   useEffect(() => {
     if (quiz && quiz.questions) {
       console.log("🔍 Quiz Questions Debug:", {
@@ -246,29 +293,28 @@ function QuizAttempt() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading quiz...</p>
+          <p className="text-gray-600 font-medium">Loading demo quiz...</p>
         </div>
       </div>
     );
   }
 
-  // In QuizAttempt.jsx - Replace the initial check
   if (!quiz || !quiz.questions) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-4">😕</div>
           <p className="text-gray-600 font-medium text-lg mb-4">
-            {!quiz ? "Quiz not found" : "Quiz data is incomplete"}
+            Demo Quiz not available
           </p>
           <p className="text-gray-500 text-sm mb-6">
-            {!quiz ? "Please go back and try again." : "Missing questions data."}
+            This is a demo. In a real app, quiz data would be loaded.
           </p>
           <button
-            onClick={() => router.push("/availablequizzes")}
+            onClick={() => router.push("/")}
             className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors duration-200"
           >
-            Back to Available Quizzes
+            Back to Dashboard
           </button>
         </div>
       </div>
@@ -302,118 +348,32 @@ function QuizAttempt() {
     setQuizStarted(true);
   };
 
-  // QuizAttempt.jsx - Add this function
   const handleTimeUp = async () => {
     if (!quizSubmitted) {
       console.log("⏰ Time's up! Auto-submitting quiz...");
-      
-      // Auto-submit the quiz
-      try {
-        setQuizSubmitted(true);
-        
-        // Calculate final score
-        let score = 0;
-        const detailedAnswers = answers.map((answer, index) => {
-          const question = quiz.questions[index];
-          if (!question) return answer;
-
-          const isCorrect = answer.selectedAnswer === question.correctAnswer;
-          if (isCorrect) {
-            score += question.marks || 1;
-          }
-
-          return {
-            questionId: question.id || `q${index}`,
-            selectedAnswer: answer.selectedAnswer,
-            isCorrect: isCorrect,
-            timeSpent: answer.timeSpent || 0
-          };
-        });
-
-        const totalMarks = quiz.totalMarks || quiz.questions.reduce((sum: number, q: Question) => sum + (q.marks || 1), 0);
-        const percentage = ((score / totalMarks) * 100).toFixed(1);
-
-        const response = await fetch(`${API_BASE}/student/quiz/attempt`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            studentId,
-            studentName,
-            quizId: quiz.id,
-            quizTitle: quiz.title,
-            teacherId: quiz.teacherId,
-            answers: detailedAnswers,
-            timeSpent: formatTotalTimeSpent()
-          })
-        });
-
-        const data = await response.json();
-        
-        if (data.success) {
-          alert("⏰ Time's up! Quiz submitted automatically.");
-          router.push("/myreports");
-        } else {
-          alert("Failed to auto-submit quiz. Please contact your teacher.");
-          router.push("/availablequizzes");
-        }
-      } catch (error) {
-        console.error("Auto-submit error:", error);
-        alert("Error auto-submitting quiz. Please contact your teacher.");
-        router.push("/availablequizzes");
-      }
+      await handleDemoSubmit("Time's up! Quiz submitted automatically.");
     }
   };
 
-  // QuizAttempt.jsx - submitQuiz function mein detailed debug add karo
   const submitQuiz = async () => {
+    await handleDemoSubmit("Quiz submitted successfully! 🎉");
+  };
+
+  const handleDemoSubmit = async (message: string) => {
     try {
       setQuizSubmitted(true);
       setShowConfirmation(false);
       
-      console.log("🔍 SUBMITTING QUIZ - DEBUG INFO:");
-      console.log("Quiz Questions:", quiz.questions);
-      console.log("Student Answers:", answers);
-
-      // Calculate score properly
+      // Calculate score for demo
       let score = 0;
       const detailedAnswers = answers.map((answer, index) => {
         const question = quiz.questions[index];
         
-        console.log(`🔍 Evaluating Q${index}:`, {
-          questionText: question?.text?.substring(0, 50),
-          correctAnswer: question?.correctAnswer,
-          correctAnswerType: typeof question?.correctAnswer,
-          selectedAnswer: answer.selectedAnswer,
-          selectedAnswerType: typeof answer.selectedAnswer,
-          options: question?.options
-        });
+        if (!question) return answer;
 
-        if (!question) {
-          console.error(`❌ Question not found for index ${index}`);
-          return {
-            questionId: answer.questionId,
-            selectedAnswer: answer.selectedAnswer,
-            isCorrect: false,
-            timeSpent: answer.timeSpent || 0
-          };
-        }
-
-        // ✅ STRICT COMPARISON with type conversion
-        const isCorrect = parseInt(answer.selectedAnswer?.toString() || '-1') === parseInt(question.correctAnswer.toString());
-        
-        console.log(`📊 Q${index} Result:`, {
-          isCorrect,
-          answerSelected: answer.selectedAnswer,
-          correctExpected: question.correctAnswer
-        });
-
+        const isCorrect = answer.selectedAnswer === question.correctAnswer;
         if (isCorrect) {
           score += question.marks || 1;
-          console.log(`✅ CORRECT! Added ${question.marks || 1} marks`);
-        } else {
-          console.log(`❌ INCORRECT`);
         }
 
         return {
@@ -424,47 +384,39 @@ function QuizAttempt() {
         };
       });
 
-      const totalMarks = quiz.totalMarks || quiz.questions.reduce((sum: number, q: Question) => sum + (q.marks || 1), 0);
-      const percentage = totalMarks > 0 ? ((score / totalMarks) * 100).toFixed(1) : 0;
+      const totalMarks = quiz.totalMarks;
+      const percentage = ((score / totalMarks) * 100).toFixed(1);
 
-      console.log("📊 FINAL SCORE:", {
+      console.log("🎉 Demo Quiz Results:", {
         score,
         totalMarks,
         percentage,
-        answersEvaluated: detailedAnswers
+        answers: detailedAnswers
       });
 
-      const response = await fetch(`${API_BASE}/student/quiz/attempt`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          studentId,
-          studentName,
-          quizId: quiz.id,
-          quizTitle: quiz.title,
-          teacherId: quiz.teacherId,
-          answers: detailedAnswers,
-          timeSpent: formatTotalTimeSpent()
-        })
-      });
+      // Store results in localStorage for demo
+      const quizResult = {
+        quizId: quiz.id,
+        quizTitle: quiz.title,
+        score,
+        totalMarks,
+        percentage,
+        date: new Date().toISOString(),
+        answers: detailedAnswers
+      };
 
-      const data = await response.json();
+      // Save to localStorage for demo reports
+      const existingResults = JSON.parse(localStorage.getItem('demoQuizResults') || '[]');
+      existingResults.push(quizResult);
+      localStorage.setItem('demoQuizResults', JSON.stringify(existingResults));
+
+      alert(message);
+      router.push("/myreports");
       
-      if (data.success) {
-        console.log("🎉 Quiz submitted successfully!");
-        alert("Quiz submitted successfully! 🎉");
-        router.push("/myreports");
-      } else {
-        console.error("❌ Failed to submit quiz:", data);
-        alert("Failed to submit quiz. Please try again.");
-        router.push("/availablequizzes");
-      }
     } catch (error) {
-      console.error("❌ Error submitting quiz:", error);
-      alert("Error submitting quiz. Please try again.");
-      router.push("/availablequizzes");
+      console.error("❌ Error in demo quiz:", error);
+      alert("Demo quiz completed! Check your reports.");
+      router.push("/myreports");
     }
   };
 
@@ -521,12 +473,12 @@ function QuizAttempt() {
             </div>
 
             <div className="bg-yellow-50 rounded-2xl p-6 mb-8">
-              <h3 className="font-semibold text-yellow-800 mb-2">⚠️ Important Notes</h3>
+              <h3 className="font-semibold text-yellow-800 mb-2">⚠️ Demo Mode</h3>
               <div className="text-sm text-yellow-700">
-                <p>• Once started, the quiz cannot be paused for long</p>
-                <p>• Your answers are auto-saved as you progress</p>
-                <p>• Quiz will auto-submit when time expires</p>
-                <p>• Ensure stable internet connection</p>
+                <p>• This is a standalone frontend demo</p>
+                <p>• All data is simulated</p>
+                <p>• No backend connection required</p>
+                <p>• Results saved in browser storage only</p>
               </div>
             </div>
 
@@ -535,10 +487,10 @@ function QuizAttempt() {
                 onClick={handleStartQuiz}
                 className="px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-bold text-lg hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg"
               >
-                🚀 Start Quiz Now
+                🚀 Start Demo Quiz
               </button>
               <p className="text-gray-500 text-sm mt-4">
-                You have {quiz.duration} minutes to complete this quiz
+                You have {quiz.duration} minutes to complete this demo quiz
               </p>
             </div>
           </div>
@@ -623,6 +575,11 @@ function QuizAttempt() {
             >
               {quizSubmitted ? 'Submitting...' : '📨 Submit Quiz'}
             </button>
+
+            {/* Demo Notice */}
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl text-white p-4">
+              <p className="text-sm text-center">🎯 Standalone Frontend Demo</p>
+            </div>
           </div>
 
           {/* Main Question Area */}
