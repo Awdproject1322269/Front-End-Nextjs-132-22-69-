@@ -40,24 +40,28 @@ function AvailableQuizzes() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const API_BASE = "http://localhost:5000/api";
+  // Use environment variable for API base URL
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+  
   const [user, setUser] = useState<User | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
   const [studentName, setStudentName] = useState<string | null>(null);
 
+  // Mock data for initial render/demo
+  const mockQuizzes: Quiz[] = [];
+  const mockTeachers: Teacher[] = [];
+
   useEffect(() => {
-    // Check if we're in the browser before accessing localStorage
-    if (typeof window !== 'undefined') {
-      const userData = localStorage.getItem("user");
-      if (userData) {
-        try {
-          const parsedUser: User = JSON.parse(userData);
-          setUser(parsedUser);
-          setStudentId(parsedUser?.id || null);
-          setStudentName(parsedUser?.name || null);
-        } catch (error) {
-          console.error("Error parsing user data:", error);
-        }
+    // This runs only on the client side
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      try {
+        const parsedUser: User = JSON.parse(userData);
+        setUser(parsedUser);
+        setStudentId(parsedUser?.id || null);
+        setStudentName(parsedUser?.name || null);
+      } catch (error) {
+        console.error("Error parsing user data:", error);
       }
     }
   }, []);
@@ -69,6 +73,12 @@ function AvailableQuizzes() {
         setSelectedTeacher(teacherId);
       }
       loadTeachersAndQuizzes();
+    } else {
+      // If no studentId, we're in demo mode
+      setIsLoading(false);
+      setQuizzes(mockQuizzes);
+      setTeachers(mockTeachers);
+      applyFilters(mockQuizzes, null);
     }
   }, [studentId, searchParams]);
 
@@ -89,6 +99,10 @@ function AvailableQuizzes() {
 
     } catch (error) {
       console.error("Error loading data:", error);
+      // Fallback to mock data on error
+      setQuizzes(mockQuizzes);
+      setTeachers(mockTeachers);
+      applyFilters(mockQuizzes, selectedTeacher);
     } finally {
       setIsLoading(false);
     }
@@ -101,30 +115,31 @@ function AvailableQuizzes() {
         return;
       }
       
-      console.log("🔄 Loading quizzes for student:", studentId);
-      
       const API_URL = `${API_BASE}/student/quizzes/${studentId}`;
-      console.log("📡 API URL:", API_URL);
       
       const response = await fetch(API_URL);
-      console.log("📊 Response Status:", response.status);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      console.log("✅ API Response Data:", data);
       
       if (data.success) {
         const quizzesData: Quiz[] = data.quizzes || [];
         setQuizzes(quizzesData);
         applyFilters(quizzesData, selectedTeacher);
       } else {
-        console.error("❌ API returned success: false", data);
+        console.error("API returned success: false", data);
+        // Fallback
+        setQuizzes(mockQuizzes);
+        applyFilters(mockQuizzes, selectedTeacher);
       }
     } catch (error) {
-      console.error("❌ Error loading quizzes:", error);
+      console.error("Error loading quizzes:", error);
+      // Fallback to mock data
+      setQuizzes(mockQuizzes);
+      applyFilters(mockQuizzes, selectedTeacher);
     }
   };
 
@@ -175,9 +190,11 @@ function AvailableQuizzes() {
         router.push(`/quizattempt?${quizParams}`);
       } else {
         console.error("Failed to load quiz details");
+        alert("Unable to start quiz. Please try again.");
       }
     } catch (error) {
       console.error("Error loading quiz details:", error);
+      alert("Network error. Please check your connection.");
     }
   };
 
@@ -320,10 +337,20 @@ function AvailableQuizzes() {
                   ? "This teacher hasn't created any quizzes yet"
                   : filter === "attempted"
                     ? "Start taking quizzes to see your completed attempts here"
-                    : "Connect with more teachers to access their quizzes"
+                    : user 
+                      ? "Connect with more teachers to access their quizzes"
+                      : "Please log in to view available quizzes"
                 }
               </p>
-              {filter !== "attempted" && (
+              {!user && (
+                <Link
+                  href="/login"
+                  className="inline-block px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all duration-300"
+                >
+                  Log In
+                </Link>
+              )}
+              {user && filter !== "attempted" && (
                 <Link
                   href="/myteachers"
                   className="inline-block px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all duration-300"
@@ -402,6 +429,19 @@ function AvailableQuizzes() {
           )}
         </div>
       </div>
+
+      {/* Demo Notice - Show when no real data */}
+      {!studentId && filteredQuizzes.length === 0 && (
+        <div className="max-w-7xl mx-auto px-6 mt-6">
+          <div className="bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl text-white p-6">
+            <h3 className="text-lg font-semibold mb-2">💡 Demo Mode</h3>
+            <p className="text-indigo-100">
+              This is a standalone frontend demo. To see actual quizzes, please log in with a student account.
+              In a real setup, quizzes would be fetched from your connected teachers.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
