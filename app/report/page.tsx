@@ -24,147 +24,134 @@ function Report() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [selectedReports, setSelectedReports] = useState<string[]>([]);
 
-  // Fetch reports - No authentication required
-  const fetchReports = async (): Promise<void> => {
-    setIsLoading(true);
-    
-    try {
-      // Try to fetch from API
-      console.log("Fetching reports...");
-      const response = await fetch(`http://localhost:5000/api/reports/all`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Reports from API:", data);
-
-        if (data.success && data.reports) {
-          const formattedReports: Report[] = data.reports.map((report: any) => ({
-            ...report,
-            id: String(report.id)
-          }));
-          setReports(formattedReports);
-          
-          const uniqueQuizzes = [...new Set(formattedReports.map((r: Report) => r.quiz))];
-          setQuizzes(['all', ...uniqueQuizzes]);
-          setIsLoading(false);
-          return;
-        }
-      }
-      
-      // If API fails or returns no data, use mock data
-      console.log("Using mock data for reports");
-      createMockData();
-      
-    } catch (error) {
-      console.log("API error, using mock data:", error);
-      // Use mock data as fallback
-      createMockData();
+  // Mock data - No API calls needed
+  const mockReports: Report[] = [
+    {
+      id: "1",
+      student: "John Doe",
+      quiz: "Math Quiz 1",
+      score: 18,
+      total: 20,
+      percentage: 90,
+      grade: "A",
+      timeSpent: "15:30",
+      date: "2024-01-15"
+    },
+    {
+      id: "2",
+      student: "Jane Smith",
+      quiz: "Math Quiz 1",
+      score: 16,
+      total: 20,
+      percentage: 80,
+      grade: "B",
+      timeSpent: "18:45",
+      date: "2024-01-15"
+    },
+    {
+      id: "3",
+      student: "Bob Johnson",
+      quiz: "Science Quiz",
+      score: 14,
+      total: 20,
+      percentage: 70,
+      grade: "C",
+      timeSpent: "22:10",
+      date: "2024-01-16"
+    },
+    {
+      id: "4",
+      student: "Alice Williams",
+      quiz: "History Quiz",
+      score: 19,
+      total: 20,
+      percentage: 95,
+      grade: "A+",
+      timeSpent: "12:15",
+      date: "2024-01-17"
+    },
+    {
+      id: "5",
+      student: "Charlie Brown",
+      quiz: "Math Quiz 1",
+      score: 12,
+      total: 20,
+      percentage: 60,
+      grade: "D",
+      timeSpent: "25:30",
+      date: "2024-01-15"
+    },
+    {
+      id: "6",
+      student: "Emma Wilson",
+      quiz: "Science Quiz",
+      score: 20,
+      total: 20,
+      percentage: 100,
+      grade: "A+",
+      timeSpent: "10:20",
+      date: "2024-01-16"
+    },
+    {
+      id: "7",
+      student: "Michael Brown",
+      quiz: "History Quiz",
+      score: 15,
+      total: 20,
+      percentage: 75,
+      grade: "B",
+      timeSpent: "20:15",
+      date: "2024-01-17"
+    },
+    {
+      id: "8",
+      student: "Sophia Davis",
+      quiz: "English Quiz",
+      score: 17,
+      total: 20,
+      percentage: 85,
+      grade: "B+",
+      timeSpent: "14:45",
+      date: "2024-01-18"
+    },
+    {
+      id: "9",
+      student: "David Miller",
+      quiz: "Physics Quiz",
+      score: 19,
+      total: 20,
+      percentage: 95,
+      grade: "A+",
+      timeSpent: "16:20",
+      date: "2024-01-19"
+    },
+    {
+      id: "10",
+      student: "Olivia Taylor",
+      quiz: "Chemistry Quiz",
+      score: 16,
+      total: 20,
+      percentage: 80,
+      grade: "B",
+      timeSpent: "19:10",
+      date: "2024-01-20"
     }
-  };
-
-  // Create mock data for testing
-  const createMockData = (): void => {
-    console.log("Creating mock data");
-    const mockReports: Report[] = [
-      {
-        id: "1",
-        student: "John Doe",
-        quiz: "Math Quiz 1",
-        score: 18,
-        total: 20,
-        percentage: 90,
-        grade: "A",
-        timeSpent: "15:30",
-        date: "2024-01-15"
-      },
-      {
-        id: "2",
-        student: "Jane Smith",
-        quiz: "Math Quiz 1",
-        score: 16,
-        total: 20,
-        percentage: 80,
-        grade: "B",
-        timeSpent: "18:45",
-        date: "2024-01-15"
-      },
-      {
-        id: "3",
-        student: "Bob Johnson",
-        quiz: "Science Quiz",
-        score: 14,
-        total: 20,
-        percentage: 70,
-        grade: "C",
-        timeSpent: "22:10",
-        date: "2024-01-16"
-      },
-      {
-        id: "4",
-        student: "Alice Williams",
-        quiz: "History Quiz",
-        score: 19,
-        total: 20,
-        percentage: 95,
-        grade: "A+",
-        timeSpent: "12:15",
-        date: "2024-01-17"
-      },
-      {
-        id: "5",
-        student: "Charlie Brown",
-        quiz: "Math Quiz 1",
-        score: 12,
-        total: 20,
-        percentage: 60,
-        grade: "D",
-        timeSpent: "25:30",
-        date: "2024-01-15"
-      },
-      {
-        id: "6",
-        student: "Emma Wilson",
-        quiz: "Science Quiz",
-        score: 20,
-        total: 20,
-        percentage: 100,
-        grade: "A+",
-        timeSpent: "10:20",
-        date: "2024-01-16"
-      },
-      {
-        id: "7",
-        student: "Michael Brown",
-        quiz: "History Quiz",
-        score: 15,
-        total: 20,
-        percentage: 75,
-        grade: "B",
-        timeSpent: "20:15",
-        date: "2024-01-17"
-      },
-      {
-        id: "8",
-        student: "Sophia Davis",
-        quiz: "English Quiz",
-        score: 17,
-        total: 20,
-        percentage: 85,
-        grade: "B+",
-        timeSpent: "14:45",
-        date: "2024-01-18"
-      }
-    ];
-    
-    setReports(mockReports);
-    const uniqueQuizzes = [...new Set(mockReports.map((r: Report) => r.quiz))];
-    setQuizzes(['all', ...uniqueQuizzes]);
-    setIsLoading(false);
-  };
+  ];
 
   // Load reports on component mount
   useEffect(() => {
-    fetchReports();
+    const loadData = () => {
+      setIsLoading(true);
+      // Simulate loading delay
+      setTimeout(() => {
+        setReports(mockReports);
+        const uniqueQuizzes = [...new Set(mockReports.map((r: Report) => r.quiz))];
+        setQuizzes(['all', ...uniqueQuizzes]);
+        setIsLoading(false);
+      }, 800);
+    };
+
+    loadData();
   }, []);
 
   // Filter reports
@@ -342,7 +329,7 @@ function Report() {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div className="flex-1">
               <h2 className="text-2xl font-bold text-gray-800 mb-2">Quiz Performance Analytics</h2>
-              <p className="text-gray-600">View and manage student quiz reports</p>
+              <p className="text-gray-600">View and manage student quiz reports (Demo Data)</p>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-4">
@@ -363,10 +350,10 @@ function Report() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Search</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Search Students</label>
                   <input
                     type="text"
-                    placeholder="Search students..."
+                    placeholder="Search by student name..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-64 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-300"
@@ -393,16 +380,29 @@ function Report() {
             </div>
           </div>
 
+          {/* Demo Notice */}
+          <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                <span className="text-blue-600 text-lg">💡</span>
+              </div>
+              <div>
+                <p className="text-blue-700 font-medium">Demo Mode</p>
+                <p className="text-blue-600 text-sm">Showing sample data. All operations work locally in your browser.</p>
+              </div>
+            </div>
+          </div>
+
           {/* Selection Info */}
           {selectedReports.length > 0 && (
-            <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
+            <div className="mt-4 p-4 bg-green-50 rounded-xl border border-green-200">
               <div className="flex items-center justify-between">
-                <p className="text-blue-700 font-medium">
+                <p className="text-green-700 font-medium">
                   {selectedReports.length} report(s) selected
                 </p>
                 <button
                   onClick={handleEmailReports}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 text-sm font-medium"
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 text-sm font-medium"
                 >
                   📧 Email Selected
                 </button>
@@ -604,9 +604,25 @@ function Report() {
                   <span>📧</span>
                   <span>Email Selected Reports</span>
                 </button>
-                <button className="w-full text-left p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors duration-200 flex items-center gap-3">
-                  <span>📋</span>
-                  <span>Generate Class Summary</span>
+                <button 
+                  onClick={() => handleDownload('csv')}
+                  disabled={filtered.length === 0}
+                  className="w-full text-left p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors duration-200 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span>📥</span>
+                  <span>Download as CSV</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    setReports(mockReports);
+                    setSelectedQuiz("all");
+                    setSearchTerm("");
+                    alert("Data reset to default!");
+                  }}
+                  className="w-full text-left p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors duration-200 flex items-center gap-3"
+                >
+                  <span>🔄</span>
+                  <span>Reset Demo Data</span>
                 </button>
               </div>
             </section>

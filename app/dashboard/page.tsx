@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 
 // Define interfaces for type safety
 interface User {
@@ -53,7 +52,7 @@ function Dashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // Get role from URL or use default - REMOVED localStorage checks
+  // Get role from URL or use default
   const initialRole = searchParams.get('role') || "Teacher";
   const [userRole, setUserRole] = useState(initialRole);
   
@@ -65,16 +64,13 @@ function Dashboard() {
     performanceData: []
   });
 
-  // Demo user data - since we're not requiring login
+  // Demo user data
   const demoUsers = {
     Teacher: { id: "demo-teacher-123", name: "Professor Demo", role: "Teacher" },
     Student: { id: "demo-student-456", name: "Student Demo", role: "Student" }
   };
 
   const [user, setUser] = useState<User>(demoUsers[userRole as keyof typeof demoUsers]);
-
-  // API Base URL
-  const API_BASE = "http://localhost:5000/api";
 
   // Handle role switch
   const handleRoleSwitch = (role: "Teacher" | "Student") => {
@@ -89,122 +85,19 @@ function Dashboard() {
     // Load new role data
     setIsLoading(true);
     setTimeout(() => {
-      if (role === "Teacher") {
-        loadTeacherDashboard();
-      } else {
-        loadStudentDashboard();
-      }
-    }, 500);
+      setDashboardData(getDemoData(role));
+      setIsLoading(false);
+    }, 300);
   };
 
   // Load dashboard data
   useEffect(() => {
-    const loadDashboardData = async () => {
-      try {
-        if (userRole === "Teacher") {
-          await loadTeacherDashboard();
-        } else {
-          await loadStudentDashboard();
-        }
-      } catch (error) {
-        console.error("Error loading dashboard:", error);
-        // Use fallback demo data
-        setDashboardData(getDemoData(userRole));
-        setIsLoading(false);
-      }
-    };
-
-    loadDashboardData();
+    setIsLoading(true);
+    setTimeout(() => {
+      setDashboardData(getDemoData(userRole));
+      setIsLoading(false);
+    }, 500);
   }, [userRole]);
-
-  // Load teacher dashboard data
-  const loadTeacherDashboard = async () => {
-    try {
-      // Try to fetch real data, fall back to demo if API fails
-      const response = await fetch(`${API_BASE}/quizzes/teacher/${user.id}`);
-      const data = await response.json();
-
-      if (data.success && data.quizzes?.length > 0) {
-        // Real data processing
-        const totalQuizzes = data.quizzes.length || 0;
-        const stats: StatItem[] = [
-          { value: totalQuizzes.toString(), label: "Quizzes Created", change: "+2", trend: "up" as const },
-          { value: "87%", label: "Average Class Score", change: "+3%", trend: "up" as const },
-          { value: "45", label: "Active Students", change: "+5", trend: "up" as const },
-          { value: "12", label: "Courses Created", change: "+1", trend: "up" as const }
-        ];
-
-        const recentActivities: ActivityItem[] = data.quizzes.slice(0, 3).map((quiz: any, index: number) => ({
-          title: `Quiz Created: ${quiz.title || 'Untitled'}`,
-          date: new Date(quiz.createdAt || Date.now() - index * 86400000).toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
-            year: 'numeric' 
-          }),
-          type: "creation" as const,
-          score: null
-        }));
-
-        setDashboardData({
-          stats,
-          recentActivities,
-          upcomingTasks: getDemoUpcoming(userRole),
-          performanceData: [75, 82, 65, 90, 78, 85, 88]
-        });
-      } else {
-        // Use demo data
-        setDashboardData(getDemoData(userRole));
-      }
-    } catch (error) {
-      // Use demo data on error
-      setDashboardData(getDemoData(userRole));
-    }
-    setIsLoading(false);
-  };
-
-  // Load student dashboard data
-  const loadStudentDashboard = async () => {
-    try {
-      // Try to fetch real data, fall back to demo if API fails
-      const response = await fetch(`${API_BASE}/student/dashboard/${user.id}`);
-      const data = await response.json();
-
-      if (data.success && data.recentActivities?.length > 0) {
-        // Real data processing
-        const stats: StatItem[] = [
-          { value: (data.stats?.totalQuizzesAttempted || 8).toString(), label: "Quizzes Attempted", change: "+2", trend: "up" as const },
-          { value: `${data.stats?.averageScore || 85}%`, label: "Average Score", change: "+5%", trend: "up" as const },
-          { value: (data.stats?.pendingQuizzes || 3).toString(), label: "Pending Quizzes", change: "-1", trend: "down" as const },
-          { value: (data.stats?.totalTeachers || 5).toString(), label: "Connected Teachers", change: "+1", trend: "up" as const }
-        ];
-
-        const recentActivities: ActivityItem[] = data.recentActivities.slice(0, 3).map((report: any) => ({
-          title: `Attempted: ${report.quizTitle || 'Quiz'}`,
-          date: new Date(report.date || Date.now()).toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
-            year: 'numeric' 
-          }),
-          type: "quiz" as const,
-          score: report.percentage || 0
-        }));
-
-        setDashboardData({
-          stats,
-          recentActivities,
-          upcomingTasks: getDemoUpcoming(userRole),
-          performanceData: [82, 85, 78, 92, 88, 90, 87]
-        });
-      } else {
-        // Use demo data
-        setDashboardData(getDemoData(userRole));
-      }
-    } catch (error) {
-      // Use demo data on error
-      setDashboardData(getDemoData(userRole));
-    }
-    setIsLoading(false);
-  };
 
   // Demo data functions
   const getDemoData = (role: string): DashboardData => {
@@ -235,7 +128,20 @@ function Dashboard() {
           score: null 
         },
       ],
-      upcomingTasks: getDemoUpcoming(role),
+      upcomingTasks: [
+        { 
+          course: "Advanced Algorithms", 
+          date: new Date(Date.now() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), 
+          type: "Scheduled Quiz", 
+          students: 25 
+        },
+        { 
+          course: "Software Engineering", 
+          date: new Date(Date.now() + 2 * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), 
+          type: "Quiz Review", 
+          students: 30 
+        },
+      ],
       performanceData: [75, 82, 65, 90, 78, 85, 88]
     } : {
       stats: [
@@ -264,83 +170,66 @@ function Dashboard() {
           score: 85 
         },
       ],
-      upcomingTasks: getDemoUpcoming(role),
+      upcomingTasks: [
+        { 
+          course: "Data Structures Quiz", 
+          date: new Date(Date.now() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), 
+          type: "Quiz Available", 
+          duration: "45 min" 
+        },
+        { 
+          course: "Discrete Mathematics", 
+          date: new Date(Date.now() + 2 * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), 
+          type: "Practice Quiz", 
+          duration: "30 min" 
+        },
+      ],
       performanceData: [82, 85, 78, 92, 88, 90, 87]
     };
-  };
-
-  const getDemoUpcoming = (role: string): TaskItem[] => {
-    return role === "Teacher" ? [
-      { 
-        course: "Advanced Algorithms", 
-        date: new Date(Date.now() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), 
-        type: "Scheduled Quiz", 
-        students: 25 
-      },
-      { 
-        course: "Software Engineering", 
-        date: new Date(Date.now() + 2 * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), 
-        type: "Quiz Review", 
-        students: 30 
-      },
-    ] : [
-      { 
-        course: "Data Structures Quiz", 
-        date: new Date(Date.now() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), 
-        type: "Quiz Available", 
-        duration: "45 min" 
-      },
-      { 
-        course: "Discrete Mathematics", 
-        date: new Date(Date.now() + 2 * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), 
-        type: "Practice Quiz", 
-        duration: "30 min" 
-      },
-    ];
   };
 
   // Student-specific features
   const studentFeatures: FeatureItem[] = [
     {
-      icon: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
+      icon: "👨‍🏫",
       title: "My Teachers",
       description: "View connected teachers and send new connection requests.",
-      link: "/my-teachers",
+      link: "/myteachers",
       gradient: "from-blue-500 to-cyan-500"
     },
     {
-      icon: "https://cdn-icons-png.flaticon.com/512/1087/1087927.png", 
+      icon: "📝", 
       title: "Available Quizzes",
       description: "Take quizzes assigned by your connected teachers.",
       link: "/available-quizzes",
       gradient: "from-green-500 to-teal-500"
     },
     {
-      icon: "https://cdn-icons-png.flaticon.com/512/1048/1048953.png",
+      icon: "📊",
       title: "My Reports", 
       description: "View your quiz performance and progress reports.",
-      link: "/my-reports",
+      link: "/myreports",
       gradient: "from-orange-500 to-red-500"
     },
     {
-      icon: "https://cdn-icons-png.flaticon.com/512/992/992700.png",
+      icon: "🔍",
       title: "Search Teachers",
       description: "Find and connect with new teachers for more quizzes.",
       link: "/search-teachers", 
       gradient: "from-indigo-500 to-blue-500"
     },
     {
-      icon: "https://cdn-icons-png.flaticon.com/512/1828/1828884.png",
+      icon: "📚",
       title: "Quiz History",
       description: "Review your past quiz attempts and performances.",
       link: "/quiz-history",
       gradient: "from-purple-500 to-pink-500"
     },
     {
-      icon: "https://cdn-icons-png.flaticon.com/512/3524/3524659.png",
+      icon: "⚙️",
       title: "Settings",
       description: "Adjust your quiz preferences and display settings.",
-      link: "/student-settings",
+      link: "/settings",
       gradient: "from-gray-500 to-gray-700"
     }
   ];
@@ -348,42 +237,42 @@ function Dashboard() {
   // Teacher features
   const teacherFeatures: FeatureItem[] = [
     {
-      icon: "https://cdn-icons-png.flaticon.com/512/1087/1087927.png",
+      icon: "📝",
       title: "Create Quiz",
       description: "Upload PDF or type questions to generate interactive quizzes.",
       link: "/quizcreation",
       gradient: "from-blue-500 to-cyan-500"
     },
     {
-      icon: "https://cdn-icons-png.flaticon.com/512/1828/1828884.png", 
+      icon: "👥", 
       title: "Teacher Control",
       description: "Mark attendance and allow/disallow students for quizzes.",
-      link: "/teacher-control",
+      link: "/teachercontrol",
       gradient: "from-green-500 to-teal-500"
     },
     {
-      icon: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
+      icon: "👨‍🎓",
       title: "Manage Students", 
       description: "Approve student requests and manage linked students.",
-      link: "/my-teachers", // Same as student's my-teachers
+      link: "/managestudents",
       gradient: "from-orange-500 to-red-500"
     },
     {
-      icon: "https://cdn-icons-png.flaticon.com/512/1048/1048953.png",
+      icon: "📚",
       title: "Course Management",
       description: "Register courses and add topics for quiz creation.",
-      link: "/quizcreation", // Redirect to quiz creation for now
+      link: "/coursemanagement",
       gradient: "from-indigo-500 to-blue-500"
     },
     {
-      icon: "https://cdn-icons-png.flaticon.com/512/992/992700.png",
+      icon: "📊",
       title: "Reports",
       description: "View, analyze, and export quiz reports for your students.",
       link: "/report",
       gradient: "from-purple-500 to-pink-500"
     },
     {
-      icon: "https://cdn-icons-png.flaticon.com/512/3524/3524659.png",
+      icon: "⚙️",
       title: "Settings",
       description: "Adjust quiz parameters, shuffle questions, and set marks.",
       link: "/settings",
@@ -445,7 +334,7 @@ function Dashboard() {
               </div>
             </div>
             
-            {/* Role Display with Login/Register Buttons */}
+            {/* Role Display */}
             <div className="flex items-center gap-4">
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg px-6 py-3 border border-white/60 text-center font-semibold">
                 {userRole === "Teacher" ? "👨‍🏫 Demo Teacher Mode" : "👨‍🎓 Demo Student Mode"}
@@ -494,21 +383,14 @@ function Dashboard() {
           </div>
 
           {/* Features Grid */}
-          <div className="grid gap-8 md:grid-cols-3">
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             {features.map((feature, index) => (
               <div 
                 key={index}
                 className="group bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-8 border border-white/60 hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
               >
                 <div className={`w-16 h-16 rounded-2xl bg-gradient-to-r ${feature.gradient} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}>
-                  <Image 
-                    src={feature.icon} 
-                    alt={feature.title} 
-                    width={32}
-                    height={32}
-                    className="filter brightness-0 invert" 
-                    unoptimized
-                  />
+                  <span className="text-3xl">{feature.icon}</span>
                 </div>
                 <h3 className="text-xl font-semibold text-gray-800 mb-3">{feature.title}</h3>
                 <p className="text-gray-600 mb-6 leading-relaxed">{feature.description}</p>
@@ -654,13 +536,13 @@ function Dashboard() {
               <p className="text-gray-500 text-sm mb-4">
                 *Click on bars to see detailed scores. This is interactive demo data.
               </p>
-              <Link 
-                href="/registration" 
+              <button
+                onClick={() => alert("Demo mode - Registration is disabled in this demo")}
                 className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-300"
               >
-                🚀 Create Account to Save Progress
+                🚀 Click to Simulate Registration
                 <span className="ml-2">→</span>
-              </Link>
+              </button>
             </div>
           </div>
         </div>
